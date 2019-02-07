@@ -1,0 +1,60 @@
+local client_set_event_callback  = client.set_event_callback
+
+local get_prop                   = entity.get_prop
+local get_local_player           = entity.get_local_player
+local get_player_weapon	 		 = entity.get_player_weapon
+
+local interval_per_tick		 	 = globals.tickinterval
+
+local ui_get                     = ui.get
+local ui_set                     = ui.set
+local ui_newcheckbox             = ui.new_checkbox
+local ui_reference				 = ui.reference
+local ui_new_combobox			 = ui.new_combobox
+local ui_set_visible			 = ui.set_visible
+
+local smooth_ref 				 = ui_newcheckbox("RAGE", "Other", "Smooth autostop")
+local qstop_ref 				 = ui_reference("RAGE", "Other", "Quick stop")
+local qstop_save				 = ui_new_combobox("RAGE", "Other", "Quick stop (lua)", "Off", "On", "On + duck", "On + slow motion")
+
+local function is_holding_nade_or_knife()
+	local weapon = entity.get_player_weapon(get_local_player())
+	local weapon_name = entity.get_classname(weapon)
+	
+	--uncomment on the line under if you don't want autostop on taser
+	return (weapon_name == "CKnife") or (weapon_name == "CKnifeGG") or string.match(weapon_name, "Grenade") --or (weapon_name == "CWeaponTaser")
+end
+
+local function on_tick(ctx)
+	if not ui_get(smooth_ref) then
+		ui_set_visible(qstop_save, false)
+		ui_set_visible(qstop_ref, true)
+		return
+	end
+	
+	ui_set_visible(qstop_ref, false)
+	ui_set_visible(qstop_save, true)
+	
+	local local_player = get_local_player()
+	if local_player == nil then
+		return
+	end
+	local weap = get_player_weapon(local_player)
+	if weap == nil then
+		return
+	end
+	
+	local m_flNextPrimaryAttack = get_prop(weap, "m_flNextPrimaryAttack")
+	local m_nTickBase = get_prop(local_player, "m_nTickBase")
+	local can_shoot = (m_flNextPrimaryAttack <= m_nTickBase * interval_per_tick())
+	
+	if not can_shoot or is_holding_nade_or_knife() ~= nil then
+		ui_set(qstop_ref, "Off")
+	elseif ui_get(qstop_save) ~= "Off" then
+		if can_shoot or not entity.is_alive(get_local_player()) then 
+			ui_set(qstop_ref, ui_get(qstop_save))
+		end
+	end
+end
+
+client_set_event_callback("run_command", on_tick)
